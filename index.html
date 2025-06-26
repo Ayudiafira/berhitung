@@ -1,0 +1,308 @@
+body {
+        font-family: 'Comic Neue', cursive;
+        background-color: #f0f9ff;
+        background-image: radial-gradient(#60a5fa 1px, transparent 1px);
+        background-size: 30px 30px;
+    }
+    
+    .number-button {
+        transition: all 0.2s;
+    }
+    
+    .number-button:hover {
+        transform: scale(1.1);
+    }
+    
+    .number-button:active {
+        transform: scale(0.95);
+    }
+    
+    .celebration {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 100;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .confetti {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background-color: #f00;
+        opacity: 0;
+    }
+</style>
+
+<div class="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden">
+    <div class="bg-blue-500 p-4 text-center">
+        <h1 class="text-3xl font-bold text-white">Game Matematika</h1>
+        <p class="text-blue-100">Kelas 2 SD</p>
+    </div>
+    
+    <div class="p-6">
+        <div class="flex justify-between items-center mb-6">
+            <div class="bg-yellow-100 rounded-lg p-3 text-yellow-800 font-bold">
+                Skor: <span id="score">0</span>
+            </div>
+            <div class="bg-purple-100 rounded-lg p-3 text-purple-800 font-bold">
+                Level: <span id="level">1</span>
+            </div>
+        </div>
+        
+        <div id="game-container" class="mb-6">
+            <div id="question-container" class="bg-green-100 rounded-2xl p-6 text-center mb-6">
+                <div class="text-2xl font-bold text-green-800 mb-2">Berapakah hasil dari:</div>
+                <div id="question" class="text-4xl font-bold text-green-900">3 + 4 = ?</div>
+            </div>
+            
+            <div id="answer-container" class="grid grid-cols-3 gap-3">
+                <!-- Answer buttons will be generated here -->
+            </div>
+        </div>
+        
+        <div id="result-container" class="text-center mb-6 hidden">
+            <div id="result-message" class="text-2xl font-bold mb-2"></div>
+            <div id="correct-answer" class="text-xl mb-4"></div>
+            <button id="next-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-full text-lg shadow-lg transition-all">
+                Soal Berikutnya
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4 text-center text-gray-600">
+    <p>Pilih jawaban yang benar untuk mendapatkan skor!</p>
+</div>
+
+<script>
+    // Game state
+    const state = {
+        score: 0,
+        level: 1,
+        currentQuestion: null,
+        correctAnswer: null,
+        options: []
+    };
+    
+    // DOM elements
+    const scoreElement = document.getElementById('score');
+    const levelElement = document.getElementById('level');
+    const questionElement = document.getElementById('question');
+    const answerContainer = document.getElementById('answer-container');
+    const gameContainer = document.getElementById('game-container');
+    const resultContainer = document.getElementById('result-container');
+    const resultMessage = document.getElementById('result-message');
+    const correctAnswerElement = document.getElementById('correct-answer');
+    const nextButton = document.getElementById('next-button');
+    const celebrationElement = document.getElementById('celebration');
+    
+    // Generate a random number between min and max (inclusive)
+    function getRandomNumber(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+    
+    // Generate a question based on the current level
+    function generateQuestion() {
+        let num1, num2, operator, question, answer;
+        
+        if (state.level === 1) {
+            // Level 1: Addition with numbers 1-10
+            num1 = getRandomNumber(1, 10);
+            num2 = getRandomNumber(1, 10);
+            operator = '+';
+            question = `${num1} ${operator} ${num2} = ?`;
+            answer = num1 + num2;
+        } else if (state.level === 2) {
+            // Level 2: Subtraction with numbers 1-20 (result always positive)
+            num1 = getRandomNumber(10, 20);
+            num2 = getRandomNumber(1, num1);
+            operator = '-';
+            question = `${num1} ${operator} ${num2} = ?`;
+            answer = num1 - num2;
+        } else if (state.level === 3) {
+            // Level 3: Mixed addition and subtraction
+            num1 = getRandomNumber(5, 20);
+            num2 = getRandomNumber(1, 15);
+            operator = Math.random() < 0.5 ? '+' : '-';
+            
+            if (operator === '-' && num2 > num1) {
+                // Swap to ensure positive result
+                [num1, num2] = [num2, num1];
+            }
+            
+            question = `${num1} ${operator} ${num2} = ?`;
+            answer = operator === '+' ? num1 + num2 : num1 - num2;
+        } else {
+            // Level 4+: Simple multiplication (up to 5×5)
+            num1 = getRandomNumber(1, 5);
+            num2 = getRandomNumber(1, 5);
+            operator = '×';
+            question = `${num1} ${operator} ${num2} = ?`;
+            answer = num1 * num2;
+        }
+        
+        return { question, answer };
+    }
+    
+    // Generate answer options
+    function generateOptions(correctAnswer) {
+        const options = [correctAnswer];
+        
+        // Generate 5 unique wrong answers
+        while (options.length < 6) {
+            let wrongAnswer;
+            
+            if (state.level <= 2) {
+                // For levels 1-2, wrong answers are ±1-5 from correct answer
+                const offset = getRandomNumber(1, 5) * (Math.random() < 0.5 ? 1 : -1);
+                wrongAnswer = correctAnswer + offset;
+                
+                // Ensure positive numbers for young children
+                if (wrongAnswer < 0) wrongAnswer = getRandomNumber(1, 5);
+            } else {
+                // For higher levels, more varied wrong answers
+                wrongAnswer = getRandomNumber(Math.max(1, correctAnswer - 10), correctAnswer + 10);
+            }
+            
+            // Ensure unique options
+            if (!options.includes(wrongAnswer)) {
+                options.push(wrongAnswer);
+            }
+        }
+        
+        // Shuffle options
+        return options.sort(() => Math.random() - 0.5);
+    }
+    
+    // Display a new question
+    function displayQuestion() {
+        // Generate question and answer
+        const { question, answer } = generateQuestion();
+        state.currentQuestion = question;
+        state.correctAnswer = answer;
+        
+        // Generate options
+        state.options = generateOptions(answer);
+        
+        // Update UI
+        questionElement.textContent = question;
+        answerContainer.innerHTML = '';
+        
+        // Create answer buttons
+        state.options.forEach(option => {
+            const button = document.createElement('button');
+            button.className = 'number-button bg-white hover:bg-blue-100 border-2 border-blue-300 text-blue-800 font-bold text-2xl py-4 rounded-xl shadow-md';
+            button.textContent = option;
+            button.addEventListener('click', () => checkAnswer(option));
+            answerContainer.appendChild(button);
+        });
+        
+        // Show game container, hide result container
+        gameContainer.classList.remove('hidden');
+        resultContainer.classList.add('hidden');
+    }
+    
+    // Check the selected answer
+    function checkAnswer(selectedAnswer) {
+        const isCorrect = selectedAnswer === state.correctAnswer;
+        
+        // Show result
+        gameContainer.classList.add('hidden');
+        resultContainer.classList.remove('hidden');
+        
+        if (isCorrect) {
+            // Correct answer
+            resultMessage.textContent = '✅ Benar!';
+            resultMessage.className = 'text-2xl font-bold mb-2 text-green-600';
+            correctAnswerElement.textContent = `${state.currentQuestion.replace('?', state.correctAnswer)}`;
+            
+            // Update score
+            state.score += 10 * state.level;
+            scoreElement.textContent = state.score;
+            
+            // Level up every 5 correct answers
+            if (state.score >= state.level * 50 && state.level < 4) {
+                state.level++;
+                levelElement.textContent = state.level;
+                showCelebration();
+            }
+        } else {
+            // Wrong answer
+            resultMessage.textContent = '❌ Salah!';
+            resultMessage.className = 'text-2xl font-bold mb-2 text-red-600';
+            correctAnswerElement.textContent = `Jawaban yang benar: ${state.currentQuestion.replace('?', state.correctAnswer)}`;
+        }
+    }
+    
+    // Show celebration animation
+    function showCelebration() {
+        // Create confetti
+        for (let i = 0; i < 50; i++) {
+            createConfetti();
+        }
+        
+        // Show level up message
+        const levelUpMessage = document.createElement('div');
+        levelUpMessage.className = 'text-4xl font-bold text-yellow-500 animate-bounce';
+        levelUpMessage.textContent = `Level Naik! Level ${state.level}`;
+        levelUpMessage.style.textShadow = '2px 2px 4px rgba(0,0,0,0.3)';
+        celebrationElement.appendChild(levelUpMessage);
+        
+        // Remove level up message after animation
+        setTimeout(() => {
+            levelUpMessage.remove();
+        }, 3000);
+    }
+    
+    // Create a single confetti element
+    function createConfetti() {
+        const confetti = document.createElement('div');
+        confetti.className = 'confetti';
+        
+        // Random properties
+        const colors = ['#f00', '#0f0', '#00f', '#ff0', '#f0f', '#0ff'];
+        const size = getRandomNumber(5, 15);
+        const left = getRandomNumber(0, 100);
+        
+        // Set styles
+        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        confetti.style.width = `${size}px`;
+        confetti.style.height = `${size}px`;
+        confetti.style.left = `${left}%`;
+        confetti.style.top = '-20px';
+        confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+        
+        // Add to celebration container
+        celebrationElement.appendChild(confetti);
+        
+        // Animate
+        const duration = getRandomNumber(1500, 3000);
+        const rotation = getRandomNumber(-360, 360);
+        
+        // Start animation
+        setTimeout(() => {
+            confetti.style.transition = `all ${duration}ms ease-out`;
+            confetti.style.opacity = '1';
+            confetti.style.transform = `translateY(${window.innerHeight}px) rotate(${rotation}deg)`;
+        }, 10);
+        
+        // Remove after animation
+        setTimeout(() => {
+            confetti.remove();
+        }, duration + 100);
+    }
+    
+    // Event listeners
+    nextButton.addEventListener('click', displayQuestion);
+    
+    // Start the game
+    displayQuestion();
+</script>
+
+
